@@ -7,6 +7,26 @@ from fuzzywuzzy import fuzz  # Import fuzzywuzzy for fuzzy matching
 import time
 import re  # Import regex for extracting left value
 
+def handle_popup(driver):
+    try:
+        # Wait for the popup close button to appear
+        close_button = WebDriverWait(driver, 5).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "ab-close-button"))
+        )
+        print("Popup detected. Attempting to close.")
+        
+        # Click the close button
+        close_button.click()
+        
+        # Optional: Wait for the popup to disappear
+        WebDriverWait(driver, 5).until(
+            EC.invisibility_of_element((By.CLASS_NAME, "ab-close-button"))
+        )
+        print("Popup closed successfully.")
+    except Exception as e:
+        print(f"No popup detected or error while closing popup: {e}")
+
+
 def search_product(product_name, threshold=60):
     # Set up the web driver (Ensure ChromeDriver matches your Chrome version)
     driver = webdriver.Chrome()  # Or specify the path if needed
@@ -20,6 +40,7 @@ def search_product(product_name, threshold=60):
     rating = "Not available"
     profile_info = "Not available"
     left_value = "Not available"
+    bold_label_left_value = "Not available"
 
     try:
         # Wait for the search bar to be visible (adjust selector as needed)
@@ -67,6 +88,8 @@ def search_product(product_name, threshold=60):
             return {"rating": rating, "profile_info": profile_info, "left_value": left_value}
 
         # Wait for the product page to load and extract details
+        # Handle popup if it appears
+        handle_popup(driver)
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "h1")))
         product_title = driver.find_element(By.CSS_SELECTOR, "h1").text
         print("Product Title:", product_title)
@@ -85,6 +108,18 @@ def search_product(product_name, threshold=60):
         except:
             print("Profile info: Not available")
 
+        try:
+            bold_label = WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'tasteStructure__property--CLNl_') and text()='Light']"))
+            )
+            bold_label_value_span = bold_label.find_element(By.XPATH, "../following-sibling::td//span[contains(@class, 'indicatorBar__progress--3aXLX')]")
+            bold_label_style_attribute = bold_label_value_span.get_attribute("style")
+            bold_label_left_match = re.search(r"left:\s*([0-9.]+%);", bold_label_style_attribute)
+            if bold_label_left_match:
+                bold_label_left_value = bold_label_left_match.group(1)
+        except Exception as e:
+            print(f"Bold component left value extraction error: {e}")
+
         # Extract left value for "Dry"
         try:
             dry_label = WebDriverWait(driver, 10).until(
@@ -98,6 +133,12 @@ def search_product(product_name, threshold=60):
         except:
             print("Dry component left value: Not available")
 
+        # Extract left value for "Dry"
+        # Extract left value for "Bold"
+        
+
+
+
     except Exception as e:
         print(f"An error occurred: {e}")
 
@@ -105,4 +146,4 @@ def search_product(product_name, threshold=60):
         # Close the browser
         driver.quit()
 
-    return {"rating": rating, "profile_info": profile_info, "left_value": left_value}
+    return {"rating": rating, "profile_info": profile_info, "left_value": left_value, "bold_label_left_value":bold_label_left_value}
